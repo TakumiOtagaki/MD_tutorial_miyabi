@@ -1,0 +1,1 @@
+source /work/share/setup-miniforge_aarch64.sh
