@@ -6,7 +6,8 @@ import openmm as mm
 from openmm import unit
 
 # -- 入力PDBファイル --
-pdb_file = 'data/1zih.pdb'
+id = '1zih'
+pdb_file = f'data/{id}.pdb'
 
 # PDB読み込み
 pdb = app.PDBFile(pdb_file)
