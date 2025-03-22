@@ -61,7 +61,7 @@ simulation.reporters.append(app.StateDataReporter(
 
 # 短いMD実行 (1000ステップ)
 print("MD Running...")
-simulation.step(1000)
+simulation.step(10000)
 
 # 最終構造を保存
 final_positions = simulation.context.getState(getPositions=True).getPositions()
