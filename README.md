@@ -49,3 +49,11 @@ openmm_gpu_env       * /home/t01045/.conda/envs/openmm_gpu_env
 conda activate openmm_cpu_env
 python run_min_md_cpu.py
 ```
+
+
+# RNA 用の力場の installation
+```sh
+conda install -c conda-forge parmed
+find ~/.conda/envs/openmm_cpu_env/ -name '*rna*'
+
+```

@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 import sys
-from simtk.openmm import app
-import simtk.openmm as mm
-from simtk import unit
+from openmm import app
+import openmm as mm
+from openmm import unit
 
 # -- 入力PDBファイル --
 pdb_file = 'data/1zih.pdb'
@@ -12,11 +12,14 @@ pdb_file = 'data/1zih.pdb'
 pdb = app.PDBFile(pdb_file)
 
 # 力場読み込み
-# AMBER14 forcefield + RNAフラグメント用
-forcefield = app.ForceField('amber14-all.xml', 'amber14/rna.ff14SB.xml')
+# もし 'amber14/rna.ff14SB.xml' が含まれていない場合は 'amber14/rna.xml' を使用。
+# 実際に環境に存在するファイル名を必ず確認してください。
+# forcefield = app.ForceField('amber14-all.xml', 'amber14/rna.xml')
+forcefield = app.ForceField('amber14-all.xml', 'amber14/RNA.OL3.xml')
+
 
 # システムを構築
-# 本来は水中を想定しますが、ここでは NoCutoff（真空想定）で最小限のテスト
+# 本来は水中を想定しますが、ここでは真空(NoCutoff)設定に
 system = forcefield.createSystem(
     pdb.topology,
     nonbondedMethod=app.NoCutoff,
@@ -46,7 +49,8 @@ simulation.minimizeEnergy(maxIterations=500)
 
 # 最小化した構造を保存
 min_positions = simulation.context.getState(getPositions=True).getPositions()
-app.PDBFile.writeFile(simulation.topology, min_positions, open('minimized_cpu.pdb', 'w'))
+with open('minimized_cpu.pdb', 'w') as f:
+    app.PDBFile.writeFile(simulation.topology, min_positions, f)
 
 # レポーター(ログ出力)の設定
 simulation.reporters.append(app.StateDataReporter(
@@ -59,6 +63,7 @@ simulation.step(1000)
 
 # 最終構造を保存
 final_positions = simulation.context.getState(getPositions=True).getPositions()
-app.PDBFile.writeFile(simulation.topology, final_positions, open('final_cpu.pdb', 'w'))
+with open('final_cpu.pdb', 'w') as f:
+    app.PDBFile.writeFile(simulation.topology, final_positions, f)
 
 print("Done.")
