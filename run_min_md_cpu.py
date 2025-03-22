@@ -54,6 +54,7 @@ with open('minimized_cpu.pdb', 'w') as f:
     app.PDBFile.writeFile(simulation.topology, min_positions, f)
 
 # レポーター(ログ出力)の設定
+simulation.reporters.append(app.DCDReporter('trajectory.dcd', 100))
 simulation.reporters.append(app.StateDataReporter(
     sys.stdout, 100, step=True, potentialEnergy=True, temperature=True
 ))
