@@ -11,11 +11,9 @@ python argparse.py \
   --timestep 2.0 \
   --restraint_k 5.0 \
   --restraint_steps 5000 \
-  --production_steps 20000 \
+  --production_steps 10000 \
   --output_frames 200
-
 """
-#!/usr/bin/env python
 
 import sys
 import argparse
@@ -68,7 +66,7 @@ def parse_arguments():
     )
     parser.add_argument(
         "--production_steps", type=int, default=10000,
-        help="Number of MD steps in production (unrestrained) stage. (default: 20000)"
+        help="Number of MD steps in production (unrestrained) stage. (default: 10000)"
     )
 
     # ======== 出力設定 ========
@@ -92,6 +90,7 @@ def print_configuration(args):
     print("Positional restraint steps:", args.restraint_steps)
     print("Production steps:", args.production_steps)
     print("Output frames:", args.output_frames)
+
 
 def create_system_and_integration(pdb, args):
     """
@@ -125,9 +124,9 @@ def create_system_and_integration(pdb, args):
         # ボックスに 1.0 nm のマージンを取り、0.15M のイオンを加える例
         modeller.addSolvent(
             forcefield,
-            model='tip3p',
-            padding=1.0*unit.nanometer,
-            ionicStrength=0.15*unit.molar
+            model='tip3p',  # 大文字に変更
+            padding=1.0 * unit.nanometer,
+            ionicStrength=0.15 * unit.molar
         )
         topology = modeller.topology
         positions = modeller.positions
@@ -136,7 +135,7 @@ def create_system_and_integration(pdb, args):
         system = forcefield.createSystem(
             topology,
             nonbondedMethod=app.PME,
-            nonbondedCutoff=1.0*unit.nanometer,
+            nonbondedCutoff=1.0 * unit.nanometer,
             constraints=app.HBonds,
             removeCMMotion=True
         )
@@ -174,15 +173,14 @@ def create_system_and_integration(pdb, args):
     return system, integrator, topology, positions
 
 
-def add_positional_restraints(system, topology, force_k_kcal):
+def add_positional_restraints(system, topology, positions, force_k_kcal):
     """
-    指定した force_k(kcal/mol/A^2) で重原子に対する位置拘束 (positional restraints) を追加。
-    OpenMM のエネルギー単位 (kJ/mol/nm^2) に変換して CustomExternalForce を適用。
+    指定した force_k (kcal/mol/A^2) で重原子に対する位置拘束 (positional restraints) を追加。
+    OpenMM のエネルギー単位 (kJ/mol/nm^2) に変換して CustomExternalForce を適用します。
     """
     # kcal/mol/A^2 => kJ/mol/nm^2 に変換
-    #  1 kcal/mol = 4.184 kJ/mol
-    #  1 A = 0.1 nm
-    #  => force_k (kcal/mol/A^2) * 4.184 * (1/0.1^2) = force_k * 418.4
+    # 1 kcal/mol = 4.184 kJ/mol, 1 Å = 0.1 nm なので
+    # force_k (kcal/mol/A^2) * 4.184 / (0.1^2) = force_k * 418.4
     force_k = force_k_kcal * 418.4  # [kJ/mol/nm^2]
 
     restraint = mm.CustomExternalForce(
@@ -194,12 +192,12 @@ def add_positional_restraints(system, topology, force_k_kcal):
     restraint.addPerParticleParameter("z0")
 
     for atom in topology.atoms():
-        # 重原子のみ拘束 (RNA なので H 以外 = 重原子)
+        # 重原子のみ拘束 (RNA なので H 以外)
         if atom.element.symbol != 'H':
+            pos = positions[atom.index]  # positions リストから座標を取得
             restraint.addParticle(
                 atom.index,
-                [force_k,
-                 atom.position.x, atom.position.y, atom.position.z]
+                [force_k, pos.x, pos.y, pos.z]
             )
 
     system.addForce(restraint)
@@ -238,7 +236,7 @@ def main():
     system, integrator, topology, positions = create_system_and_integration(pdb, args)
 
     # --- シミュレーションオブジェクト準備 ---
-    platform = mm.Platform.getPlatformByName('CPU')  # CPU, CUDA, OpenCL等に合わせて変更
+    platform = mm.Platform.getPlatformByName('CPU')  # 環境に合わせて変更
     simulation = app.Simulation(topology, system, integrator, platform)
     simulation.context.setPositions(positions)
 
@@ -253,10 +251,10 @@ def main():
     # --- 拘束付きプレMD (stage 1) ---
     if args.restraint_steps > 0 and args.restraint_k > 0.0:
         print(f"Adding positional restraints (k={args.restraint_k} kcal/mol/A^2)...")
-        add_positional_restraints(system, topology, args.restraint_k)
+        add_positional_restraints(system, topology, positions, args.restraint_k)
         simulation.context.reinitialize(preserveState=True)
 
-        # 報告間隔: 出力フレーム数を固定したい => interval = max(1, steps // output_frames)
+        # 出力フレーム数を固定: interval = max(1, steps // output_frames)
         interval_stage1 = max(1, args.restraint_steps // args.output_frames)
 
         print("Running restrained MD...")
@@ -264,7 +262,7 @@ def main():
                dcd_name=f"result/{pdb_id}_restrained.dcd",
                state_stdout=sys.stdout)
 
-        # 拘束付きの段階が終了したら Force を除去しておく (段階的に下げる場合は適宜改造)
+        # 拘束付き段階終了後、拘束力を除去
         system_forces = system.getForces()
         for f in system_forces:
             if isinstance(f, mm.CustomExternalForce):
