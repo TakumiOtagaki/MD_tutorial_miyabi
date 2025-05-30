@@ -56,4 +56,4 @@ python run_min_md_cpu.py
 conda install -c conda-forge parmed
 find ~/.conda/envs/openmm_cpu_env/ -name '*rna*'
 
-```# RfamGenInfoGeo
+```
